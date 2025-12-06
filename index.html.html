@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>建築設計轉監造交接檢核表</title>
+<style>
+  /* Base Styles & Variables (與先前相同，略過部分 CSS 避免冗長) */
+  :root {
+    --primary: #2c3e50;
+    --accent: #3498db;
+    --success: #27ae60;
+    --warning: #f39c12;
+    --bg: #f4f7f6;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg);
+    margin: 0;
+    padding: 0;
+    color: #333;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Header & Progress Bar */
+  .header {
+    background-color: var(--primary);
+    color: white;
+    padding: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  .project-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+  .progress-container { background: rgba(255,255,255,0.2); height: 8px; border-radius: 4px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.3s ease; }
+  .progress-text { font-size: 0.8rem; margin-top: 5px; opacity: 0.9; display: flex; justify-content: space-between; }
+
+  /* Content Container */
+  .container { padding: 15px; padding-bottom: 80px; }
+  
+  /* Category Card (Accordion) */
+  .category-card {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+  .category-header {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    font-weight: bold;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .item-list { display: none; padding: 0; }
+  .item-list.active { display: block; }
+
+  /* Checklist Item */
+  .check-item {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .check-item:last-child { border-bottom: none; }
+  .item-name { font-size: 1rem; margin-bottom: 10px; font-weight: 500; }
+  .item-sub { font-size: 0.85rem; color: #777; margin-bottom: 10px; display: block;}
+
+  /* Action Buttons (Status Toggle) */
+  .actions { display: flex; gap: 8px; }
+  .btn {
+    flex: 1;
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.checked { background-color: var(--success); color: white; border-color: var(--success); }
+  .btn.issue { background-color: var(--warning); color: white; border-color: var(--warning); }
+  .btn-icon { flex: 0 0 40px; font-size: 1.2rem; padding: 8px; } /* Notes button */
+
+  /* Notes Input */
+  .note-input {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    display: none; 
+    box-sizing: border-box;
+    resize: vertical;
+  }
+  .note-input.show { display: block; }
+
+  /* Floating Submit Button */
+  .fab {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    text-align: center;
+    border-radius: 30px;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(44, 62, 80, 0.4);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="project-title">專案：建築設計交接檢核</div>
+  <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="progress-text">
+    <span>交接完成度</span>
+    <span id="progressText">0%</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="category-card">
+    <div class="category-header" onclick="toggleCategory(this)">
+      <span>📂 壹、法定文件與執照</span>
+      <span>▼</span>
+    </div>
+    <div class="item-list">
+      <div class="check-item" data-item-category="法定文件" data-item-name="建造執照正本/影本">
+        <span class="item-name">1.1 建造執照正本/影本</span>
+        <span class="item-sub">含執照背單、附表</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="輸入備註或拍照說明..."></textarea>
+      </div>
+      <div class="check-item" data-item-category="法定文件" data-item-name="核准圖說 (副本)">
+        <span class="item-name">1.2 核准圖說 (副本)</span>
+        <span class="item-sub">市府核章版，需確認版次</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="輸入備註..."></textarea>
+      </div>
+      <div class="check-item" data-item-category="法定文件" data-item-name="五大管線核准函">
+        <span class="item-name">1.3 五大管線核准函</span>
+        <span class="item-sub">電力、自來水、消防等審查文件</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="輸入備註..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="category-card">
+    <div class="category-header" onclick="toggleCategory(this)">
+      <span>📐 貳、圖說資料</span>
+      <span>▼</span>
+    </div>
+    <div class="item-list">
+      <div class="check-item" data-item-category="圖說資料" data-item-name="定案建築施工圖">
+        <span class="item-name">2.1 定案建築施工圖</span>
+        <span class="item-sub">確認為最新版次 (Rev)</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="輸入版次編號..."></textarea>
+      </div>
+       <div class="check-item" data-item-category="圖說資料" data-item-name="結構施工圖">
+        <span class="item-name">2.2 結構施工圖</span>
+        <span class="item-sub">基礎、柱、樑、版配筋圖</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="輸入備註..."></textarea>
+      </div>
+       <div class="check-item" data-item-category="圖說資料" data-item-name="套繪圖面 (CSD/SEM)">
+        <span class="item-name">2.3 套繪圖面 (CSD/SEM)</span>
+        <span class="item-sub">重要：機電結構整合圖</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+    </div>
+  </div>
+  
+  <div class="category-card">
+    <div class="category-header" onclick="toggleCategory(this)">
+      <span>🏗️ 參、技術文件與基地資訊</span>
+      <span>▼</span>
+    </div>
+    <div class="item-list">
+      <div class="check-item" data-item-category="技術文件" data-item-name="施工規範 (Spec)">
+        <span class="item-name">3.1 施工規範 (Spec)</span>
+        <span class="item-sub">各工項材料等級與檢驗標準</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+       <div class="check-item" data-item-category="技術文件" data-item-name="地質鑽探報告">
+        <span class="item-name">3.2 地質鑽探報告</span>
+        <span class="item-sub">含土壤液化分析、地下水位資訊</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+      <div class="check-item" data-item-category="技術文件" data-item-name="鄰房現況鑑定報告">
+        <span class="item-name">3.3 鄰房現況鑑定報告</span>
+        <span class="item-sub">開工前周邊建物拍照紀錄</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="category-card">
+    <div class="category-header" onclick="toggleCategory(this)">
+      <span>💰 肆、合約與預算</span>
+      <span>▼</span>
+    </div>
+    <div class="item-list">
+      <div class="check-item" data-item-category="合約預算" data-item-name="工程合約副本">
+        <span class="item-name">4.1 工程合約副本</span>
+        <span class="item-sub">含工期、付款辦法、罰則</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+      <div class="check-item" data-item-category="合約預算" data-item-name="詳細價目表 (BQ)">
+        <span class="item-name">4.2 詳細價目表 (BQ)</span>
+        <span class="item-sub">用於審核估驗計價</span>
+        <div class="actions">
+          <button class="btn" onclick="setStatus(this, 'ok')">✅ 已備</button>
+          <button class="btn" onclick="setStatus(this, 'issue')">⚠️ 缺漏</button>
+          <button class="btn btn-icon" onclick="toggleNote(this)">📝</button>
+        </div>
+        <textarea class="note-input" placeholder="備註..."></textarea>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="fab" onclick="generateReport()">
+  💾 生成並匯出文本報告
+</div>
+
+<script>
+  // Global mapping to store item status (used for report generation)
+  const itemStatusMap = {};
+
+  // 展開/收合類別
+  function toggleCategory(header) {
+    const list = header.nextElementSibling;
+    list.classList.toggle('active');
+    const arrow = header.querySelector('span:last-child');
+    arrow.textContent = list.classList.contains('active') ? '▲' : '▼';
+  }
+
+  // 設定狀態並更新進度
+  function setStatus(btn, status) {
+    const parent = btn.parentElement;
+    const item = parent.closest('.check-item');
+    const buttons = parent.querySelectorAll('.btn');
+    
+    buttons.forEach(b => b.classList.remove('checked', 'issue'));
+
+    if (status === 'ok') {
+      btn.classList.add('checked');
+      itemStatusMap[item.dataset.itemName] = { status: '已備 (OK)', note: item.querySelector('.note-input').value, category: item.dataset.itemCategory };
+    } else if (status === 'issue') {
+      btn.classList.add('issue');
+      const noteInput = item.querySelector('.note-input');
+      noteInput.classList.add('show');
+      noteInput.focus();
+      itemStatusMap[item.dataset.itemName] = { status: '缺漏 (ISSUE)', note: noteInput.value, category: item.dataset.itemCategory };
+    }
+
+    // 儲存備註
+    item.querySelector('.note-input').oninput = function() {
+        if (itemStatusMap[item.dataset.itemName]) {
+            itemStatusMap[item.dataset.itemName].note = this.value;
+        }
+    };
+    
+    updateProgress();
+  }
+
+  // 展開/收合備註
+  function toggleNote(btn) {
+    const noteInput = btn.closest('.check-item').querySelector('.note-input');
+    noteInput.classList.toggle('show');
+  }
+
+  // 計算進度
+  function updateProgress() {
+    const totalItems = document.querySelectorAll('.check-item').length;
+    const completedItems = document.querySelectorAll('.btn.checked').length;
+    const percent = Math.round((completedItems / totalItems) * 100);
+    
+    document.getElementById('progressBar').style.width = percent + '%';
+    document.getElementById('progressText').textContent = percent + '%';
+  }
+
+  // 生成報告函式
+  function generateReport() {
+    let reportText = `=== 建築交接檢核報告書 ===\n`;
+    reportText += `專案名稱: 建築設計交接檢核 (模擬)\n`;
+    reportText += `完成度: ${document.getElementById('progressText').textContent}\n\n`;
+    
+    let currentCategory = '';
+    
+    // Iterate over the stored status map
+    for (const itemName in itemStatusMap) {
+        const item = itemStatusMap[itemName];
+        
+        // Add Category Header if it changes
+        if (item.category !== currentCategory) {
+            reportText += `--- ${item.category} ---\n`;
+            currentCategory = item.category;
+        }
+
+        reportText += `[ ${item.status.padEnd(10, ' ')} ] ${itemName}\n`;
+        if (item.note) {
+            reportText += `  └ 備註: ${item.note}\n`;
+        }
+    }
+
+    reportText += `\n=== 報告結束 ===\n`;
+    
+    // Display report in a modal/alert for easy copying
+    if (confirm("交接報告已生成！您是否要複製到剪貼簿？\n\n報告內容：\n" + reportText)) {
+         navigator.clipboard.writeText(reportText).then(() => {
+            alert('報告內容已成功複製到剪貼簿。');
+        }).catch(err => {
+            console.error('無法複製文字: ', err);
+            alert('複製失敗，請手動選取並複製報告內容。');
+        });
+    }
+  }
+
+  // Initial update
+  document.addEventListener('DOMContentLoaded', updateProgress);
+</script>
+
+</body>
+</html>
